@@ -228,8 +228,8 @@ mod animations {
                 if let Some(Some((n, start))) = it.peek() {
                     for key in up_left_from(*start).take(*n as usize) {
                         launchpad.send(&Command::KeyOn(key, SimpleColor::Static(*color)))?;
-                        let mut x;
-                        let mut y;
+                        let mut x = 0;
+                        let mut y = 0;
                         (x, y) = key_to_coords(key);
                         for _ in 0..3 {
                             (x, y) = ((-(y as i8 - 5) + 5) as u8, x);
