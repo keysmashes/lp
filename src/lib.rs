@@ -25,13 +25,13 @@ pub enum ConnectionError {
     SendError(#[from] midir::SendError),
 }
 
-impl From<midir::ConnectError<MidiOutput>> for ConnectionError {
+impl From<ConnectError<MidiOutput>> for ConnectionError {
     fn from(_: ConnectError<MidiOutput>) -> Self {
         ConnectionError::ConnectionError
     }
 }
 
-impl From<midir::ConnectError<MidiInput>> for ConnectionError {
+impl From<ConnectError<MidiInput>> for ConnectionError {
     fn from(_: ConnectError<MidiInput>) -> Self {
         ConnectionError::ConnectionError
     }
@@ -62,7 +62,7 @@ pub fn rect(a: Key, b: Key) -> impl Iterator<Item = Key> {
             Some((x + 1, *y))
         }
     })
-        .map(|(x, y)| coords_to_key(x, y))
+    .map(|(x, y)| coords_to_key(x, y))
 }
 
 pub type Key = u8;
@@ -247,11 +247,17 @@ impl<'a> Command<'a> {
                 buf.write_all(&[0xf7])?;
                 Ok(())
             }
+            #[rustfmt::skip]
             Command::SetAwake(awake) => buf.write_all(&[0xf0, 0x00, 0x20, 0x29, 0x02, 0x0d, 0x09, (*awake).into(), 0xf7]),
+            #[rustfmt::skip]
             Command::GetAwake => buf.write_all(&[0xf0, 0x00, 0x20, 0x29, 0x02, 0x0d, 0x09, 0xf7]),
+            #[rustfmt::skip]
             Command::SetBrightness(brightness) => buf.write_all(&[0xf0, 0x00, 0x20, 0x29, 0x02, 0x0d, 0x08, *brightness, 0xf7]),
+            #[rustfmt::skip]
             Command::GetBrightness => buf.write_all(&[0xf0, 0x00, 0x20, 0x29, 0x02, 0x0d, 0x08, 0xf7]),
+            #[rustfmt::skip]
             Command::SetLedFeedback(internal, external) => buf.write_all(&[0xf0, 0x00, 0x20, 0x29, 0x02, 0x0d, 0x0a, (*internal).into(), (*external).into(), 0xf7]),
+            #[rustfmt::skip]
             Command::GetLedFeedback => buf.write_all(&[0xf0, 0x00, 0x20, 0x29, 0x02, 0x0d, 0x0a, 0xf7]),
         }
     }
@@ -300,8 +306,8 @@ impl Launchpad {
     pub fn connect<T: FnMut(u64, Message) + Send + 'static>(
         mut callback: T,
     ) -> Result<Launchpad, ConnectionError> {
-        let midi_in = midir::MidiInput::new("midir input")?;
-        let midi_out = midir::MidiOutput::new("midir output")?;
+        let midi_in = MidiInput::new("midir input")?;
+        let midi_out = MidiOutput::new("midir output")?;
 
         let midi_out_port = midi_out
             .ports()
@@ -332,7 +338,9 @@ impl Launchpad {
             current: HashMap::with_capacity(81),
         };
         for key in rect(11, 99) {
-            launchpad.current.insert(key, Color::Simple(SimpleColor::Static(0)));
+            launchpad
+                .current
+                .insert(key, Color::Simple(SimpleColor::Static(0)));
         }
         // switch to programmer mode
         launchpad.send(&Command::SetProgrammerMode(true))?;
@@ -354,11 +362,11 @@ impl Launchpad {
         Launchpad::_send(command, &mut self.send_buf, &mut self.out_con)?;
         if let Command::KeyOn(key, color) = command {
             // self.current[*key as usize] = Color::Simple(*color);
-            *self.current.get_mut(&key).unwrap() = Color::Simple(*color);
+            *self.current.get_mut(key).unwrap() = Color::Simple(*color);
         } else if let Command::SetColors(colors) = command {
             for (key, color) in colors.iter() {
                 // self.current[*key as usize] = Color::Complex(*color);
-                *self.current.get_mut(&key).unwrap() = Color::Complex(*color);
+                *self.current.get_mut(key).unwrap() = Color::Complex(*color);
             }
         }
         Ok(())
@@ -371,11 +379,11 @@ impl Launchpad {
                 *self.current.get_mut(&key).unwrap() = new[&key];
                 match new[&key] {
                     Color::Simple(c) => Launchpad::_send(
-                        &Command::KeyOn(key as u8, c),
+                        &Command::KeyOn(key, c),
                         &mut self.send_buf,
                         &mut self.out_con,
                     )?,
-                    Color::Complex(c) => self.complex_color_buf.push((key as u8, c)),
+                    Color::Complex(c) => self.complex_color_buf.push((key, c)),
                 }
             }
         }

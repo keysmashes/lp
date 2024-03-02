@@ -1,5 +1,6 @@
+mod ui;
+
 use std::collections::HashMap;
-use std::panic::Location;
 use std::process;
 use std::{
     collections::hash_map::DefaultHasher,
@@ -14,13 +15,12 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use eyre::WrapErr;
 use i3_ipc::{Connect, I3};
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 // use rdev::Key::*;
 
 use lp::{
     coords_to_key, key_to_coords, rect, Color, Command, ComplexColor, Key, Launchpad, Message,
-    SimpleColor, TextColor,
+    SimpleColor,
 };
 
 // https://gist.github.com/sug0/b5eb2c58be74f7cda230b8c1e1994670
@@ -266,12 +266,18 @@ mod animations {
             }
         }
         // next, pulse the focused key (it will remain this way throughout)
-        launchpad.send(&Command::KeyOn(coords_to_key(focus_x, focus_y), SimpleColor::Pulsing(9)))?;
+        launchpad.send(&Command::KeyOn(
+            coords_to_key(focus_x, focus_y),
+            SimpleColor::Pulsing(9),
+        ))?;
         // launchpad.send(&Command::KeyOn(coords_to_key(focus_x, focus_y), SimpleColor::Static(9)))?;
 
         fn light(launchpad: &mut Launchpad, x: i8, y: i8) -> eyre::Result<()> {
             if (1..=9).contains(&x) && (1..=9).contains(&y) {
-                launchpad.send(&Command::KeyOn(coords_to_key(x as u8, y as u8), SimpleColor::Static(9)))?;
+                launchpad.send(&Command::KeyOn(
+                    coords_to_key(x as u8, y as u8),
+                    SimpleColor::Static(9),
+                ))?;
             }
             Ok(())
         }
@@ -304,7 +310,10 @@ mod animations {
                     for x in left_bound..=right_bound {
                         for y in bottom_bound..=top_bound {
                             if x != focus_x || y != focus_y {
-                                launchpad.send(&Command::KeyOn(coords_to_key(x, y), SimpleColor::Static(9)))?;
+                                launchpad.send(&Command::KeyOn(
+                                    coords_to_key(x, y),
+                                    SimpleColor::Static(9),
+                                ))?;
                             }
                         }
                     }
@@ -545,8 +554,13 @@ fn main() -> eyre::Result<()> {
     thread::spawn({
         let tx = tx.clone();
         move || {
-            for line in
-                BufReader::new(duct::cmd!("playerctl", "-F", "status").unchecked().reader().unwrap()).lines()
+            for line in BufReader::new(
+                duct::cmd!("playerctl", "-F", "status")
+                    .unchecked()
+                    .reader()
+                    .unwrap(),
+            )
+            .lines()
             {
                 match line.unwrap().as_str() {
                     "Playing" => tx.send(Event::MediaPlaying(true)).unwrap(),
@@ -725,7 +739,9 @@ fn main() -> eyre::Result<()> {
         ("DP-2", 21u8),
         ("HDMI-1", 37u8),
         ("HDMI-2", 45u8),
-    ].into_iter().collect();
+    ]
+    .into_iter()
+    .collect();
 
     for event in rx.iter() {
         if let Event::Exit = event {
@@ -749,280 +765,7 @@ fn main() -> eyre::Result<()> {
         for key in rect(11, 99) {
             *fb.get_mut(&key).unwrap() = Color::Simple(SimpleColor::Static(0));
         }
-        struct Ui<'a> {
-            fb: &'a mut HashMap<Key, Color>,
-            event: Event,
-            launchpad_for_side_effects: &'a mut Launchpad,
-            tx_for_side_effects: &'a mpsc::Sender<Event>,
-        }
-        impl<'a> Ui<'a> {
-            /// A tabstrip widget.
-            #[track_caller]
-            fn tabs<const LEN: u8>(&mut self, start: Key) -> u8 {
-                static DATA: Lazy<Mutex<HashMap<&Location, u8>>> = Lazy::new(|| {
-                    let m = HashMap::with_capacity(1);
-                    Mutex::new(m)
-                });
-                let mut data = DATA.lock();
-                let tab = data.entry(Location::caller()).or_insert(0);
-                *tab = match self.event {
-                    Event::KeyDown(key) if key >= start && key < start + LEN => key - start,
-                    _ => *tab,
-                };
-                for (i, k) in (start..start + LEN).enumerate() {
-                    *self.fb.get_mut(&k).unwrap() = if *tab == i as u8 {
-                        Color::Simple(SimpleColor::Static(20))
-                    } else {
-                        Color::Simple(SimpleColor::Static(1))
-                    };
-                }
-                *tab
-            }
-            /// A static, unchanging colour.
-            #[track_caller]
-            fn static_color(&mut self, key: Key, color: Color) {
-                *self.fb.get_mut(&key).unwrap() = color;
-            }
-            /// A toggleable button.
-            #[track_caller]
-            fn toggle_button(
-                &mut self,
-                key: Key,
-                inactive_color: Color,
-                active_color: Color,
-            ) -> bool {
-                static DATA: Lazy<Mutex<HashMap<(Key, &Location), bool>>> =
-                    Lazy::new(|| Mutex::new(HashMap::new()));
-                let mut data = DATA.lock();
-                let enabled = data.entry((key, Location::caller())).or_insert(false);
-                *enabled = match self.event {
-                    Event::KeyDown(k) if k == key => !*enabled,
-                    _ => *enabled,
-                };
-                *self.fb.get_mut(&key).unwrap() = if *enabled {
-                    active_color
-                } else {
-                    inactive_color
-                };
-                *enabled
-            }
-            /// A pair of buttons that decrement and increment a counter respectively.
-            #[track_caller]
-            fn counter_buttons<const MAX: i64>(&mut self, start: Key) -> i64 {
-                static DATA: Lazy<Mutex<HashMap<(Key, &Location), i64>>> =
-                    Lazy::new(|| Mutex::new(HashMap::new()));
-                let mut data = DATA.lock();
-                let n = data.entry((start, Location::caller())).or_insert(0);
-                *n += match self.event {
-                    Event::KeyDown(k) if k == start => -1,
-                    Event::KeyDown(k) if k == start + 1 => 1,
-                    _ => 0,
-                };
-                if *n == MAX {
-                    *n = 0;
-                } else if *n == -1 {
-                    *n = MAX - 1;
-                }
-                *self.fb.get_mut(&start).unwrap() = match self.event {
-                    Event::KeyDown(k) if k == start => Color::Simple(SimpleColor::Static(2)),
-                    _ => Color::Simple(SimpleColor::Static(1)),
-                };
-                *self.fb.get_mut(&(start + 1)).unwrap() = match self.event {
-                    Event::KeyDown(k) if k == start + 1 => Color::Simple(SimpleColor::Static(2)),
-                    _ => Color::Simple(SimpleColor::Static(1)),
-                };
-                *n
-            }
-            /// A button that displays text when pressed.
-            #[track_caller]
-            fn info_button(&mut self, key: Key, color: Color, text: &str) {
-                *self.fb.get_mut(&key).unwrap() = color;
-                if let Event::KeyDown(k) = self.event {
-                    if k == key {
-                        self.launchpad_for_side_effects
-                            .send(&Command::ScrollText {
-                                loops: Some(false),
-                                speed: Some(15),
-                                color: Some(TextColor::Palette(3)),
-                                text: Some(text),
-                            })
-                            .unwrap()
-                    }
-                }
-            }
-            /// A button that returns true once when pressed.
-            #[track_caller]
-            fn impulse_button(&mut self, key: Key, color: Color, pressed_color: Color) -> bool {
-                static DATA: Lazy<Mutex<HashMap<(Key, &Location), bool>>> =
-                    Lazy::new(|| Mutex::new(HashMap::new()));
-                let mut data = DATA.lock();
-                let pressed = data.entry((key, Location::caller())).or_insert(false);
-                *pressed = match self.event {
-                    Event::KeyDown(k) if k == key => true,
-                    Event::KeyUp(k) if k == key => false,
-                    _ => *pressed,
-                };
-                *self.fb.get_mut(&key).unwrap() = if *pressed { pressed_color } else { color };
-                if let Event::KeyDown(k) = self.event {
-                    k == key
-                } else {
-                    false
-                }
-            }
-            /// A button that can be pressed, released, or that nothing can happen to.
-            #[track_caller]
-            fn press_release_button(
-                &mut self,
-                key: Key,
-                color: Color,
-                pressed_color: Color,
-            ) -> Option<bool> {
-                static DATA: Lazy<Mutex<HashMap<(Key, &Location), bool>>> =
-                    Lazy::new(|| Mutex::new(HashMap::new()));
-                let mut data = DATA.lock();
-                let pressed = data.entry((key, Location::caller())).or_insert(false);
-                *pressed = match self.event {
-                    Event::KeyDown(k) if k == key => true,
-                    Event::KeyUp(k) if k == key => false,
-                    _ => *pressed,
-                };
-                *self.fb.get_mut(&key).unwrap() = if *pressed { pressed_color } else { color };
-                match self.event {
-                    Event::KeyDown(k) if k == key => Some(true),
-                    Event::KeyUp(k) if k == key => Some(false),
-                    _ => None,
-                }
-            }
-            /// A helper function that returns `true` exactly once each time `val` becomes `true`.
-            #[track_caller]
-            fn monostable(&mut self, val: bool, extra_key: u8) -> bool {
-                static DATA: Lazy<Mutex<HashMap<(u8, &Location), bool>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-                let mut data = DATA.lock();
-                let prev = data.entry((extra_key, Location::caller())).or_insert(val);
-                let ret = val && !*prev;
-                *prev = val;
-                ret
-            }
-            /// A button that returns whether it is currently held down.
-            #[track_caller]
-            fn holdable_button(&mut self, key: Key, color: Color, pressed_color: Color) -> bool {
-                static DATA: Lazy<Mutex<HashMap<(Key, &Location), bool>>> =
-                    Lazy::new(|| Mutex::new(HashMap::new()));
-                let mut data = DATA.lock();
-                let pressed = data.entry((key, Location::caller())).or_insert(false);
-                *pressed = match self.event {
-                    Event::KeyDown(k) if k == key => true,
-                    Event::KeyUp(k) if k == key => false,
-                    _ => *pressed,
-                };
-                *self.fb.get_mut(&key).unwrap() = if *pressed { pressed_color } else { color };
-                *pressed
-            }
-            /// A slider to control LED brightness.
-            #[track_caller]
-            fn led_slider(&mut self, start: Key) {
-                assert_eq!(start % 10, 1);
-                static DATA: Lazy<Mutex<Option<u8>>> = Lazy::new(|| Mutex::new(None));
-                let mut brightness = DATA.lock();
-                if let Event::Brightness(b) = self.event {
-                    *brightness = Some(b);
-                }
-                if brightness.is_none() {
-                    // thread::sleep(Duration::from_millis(2)); // XXX HACK EW EW EW
-                    self.launchpad_for_side_effects
-                        .send(&Command::GetBrightness)
-                        .unwrap();
-                }
-                for i in 0..8 {
-                    let color = if brightness.unwrap_or(255) / 16 == i {
-                        Color::Simple(SimpleColor::Static(113))
-                    } else {
-                        Color::Simple(SimpleColor::Static(104))
-                    };
-                    if self.impulse_button(start + i, color, color) {
-                        // the "correct" sequence here is: 0, 18, 36, 54, 72, 91, 109, 127
-                        // integer maths gives 90 and 108, not 91 and 109:
-                        //     (i as u64 * 127 / 7) as u8
-                        // floating-point maths and rounding gives 73, not 72:
-                        //     ((i as f32 * 127. / 7.).round()) as u8
-                        // so we have to bias the result a little by subtracting 0.1 after the division
-                        // hey novation: ????????
-                        let b = (i as f32 * 127. / 7. - 0.1).round() as u8;
-                        self.launchpad_for_side_effects
-                            .send(&Command::SetBrightness(b))
-                            .unwrap();
-                        self.launchpad_for_side_effects
-                            .send(&Command::GetBrightness)
-                            .unwrap();
-                    }
-                }
-            }
-            /// A button that quits the application when pressed.
-            #[track_caller]
-            fn exit_button(&mut self, key: Key) {
-                if self.impulse_button(
-                    key,
-                    Color::Simple(SimpleColor::Static(6)),
-                    Color::Simple(SimpleColor::Static(6)),
-                ) {
-                    // delayed by an iteration of the loop... not ideal, but quick and easy
-                    self.tx_for_side_effects.send(Event::Exit).unwrap();
-                }
-            }
-            /// A sleep button. Designed to be wrapped around the entire UI; when asleep, reacts to and rewrites any button-press to a plain redraw.
-            #[track_caller]
-            fn awake(&mut self, key: Key, color: Color) -> bool {
-                static DATA: Lazy<Mutex<HashMap<(Key, &Location), bool>>> =
-                    Lazy::new(|| Mutex::new(HashMap::new()));
-                let mut data = DATA.lock();
-                let awake = data.entry((key, Location::caller())).or_insert(true);
-                *awake = match (*awake, &self.event) {
-                    (true, &Event::KeyDown(k)) if k == key => false,
-                    (true, _) => *awake,
-                    (false, &Event::KeyUp(k)) if k == key => *awake,
-                    (false, &Event::KeyDown(_)) => {
-                        self.event = Event::Redraw;
-                        true
-                    }
-                    (false, _) => *awake,
-                };
-                *self.fb.get_mut(&key).unwrap() = if *awake {
-                    color
-                } else {
-                    Color::Simple(SimpleColor::Static(0))
-                };
-                *awake
-            }
-            #[track_caller]
-            fn play_pause_button(
-                &mut self,
-                key: Key,
-                playing_color: Color,
-                paused_color: Color,
-            ) -> eyre::Result<()> {
-                static DATA: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(duct::cmd!("playerctl", "status").unchecked().read().unwrap() == "Playing"));
-                let mut data = DATA.lock();
-                let playing = &mut *data;
-                *playing = match self.event {
-                    Event::MediaPlaying(p) => p,
-                    _ => *playing,
-                };
-                let color = if *playing {
-                    playing_color
-                } else {
-                    paused_color
-                };
-                if self.impulse_button(key, color, color) {
-                    if *playing {
-                        process::Command::new("playerctl").arg("pause").status()?;
-                    } else {
-                        process::Command::new("playerctl").arg("play").status()?;
-                    }
-                }
-                Ok(())
-            }
-        }
-        let mut ui = Ui {
+        let mut ui = ui::Ui {
             fb: &mut fb,
             event,
             launchpad_for_side_effects: &mut launchpad,
@@ -1067,7 +810,13 @@ fn main() -> eyre::Result<()> {
                                 if w.urgent {
                                     // Color::simple(9)
                                     if first_time {
-                                        animations::alert(ui.launchpad_for_side_effects, Some(81 - (workspace_num / 5 * 10) + (workspace_num % 5))).wrap_err("couldn't display alert animation")?;
+                                        animations::alert(
+                                            ui.launchpad_for_side_effects,
+                                            Some(
+                                                81 - (workspace_num / 5 * 10) + (workspace_num % 5),
+                                            ),
+                                        )
+                                        .wrap_err("couldn't display alert animation")?;
                                         ui.tx_for_side_effects.send(Event::Redraw).unwrap();
                                     }
                                     Color::Simple(SimpleColor::Pulsing(9))
@@ -1236,18 +985,28 @@ fn main() -> eyre::Result<()> {
                     }
 
                     // shortcuts
-                    ui.static_color(88, if process::Command::new("lsusb")
-                        .arg("-d")
-                        .arg("17a0:0304")
-                        .stdout(process::Stdio::null())
-                        .status()?.success() { Color::simple(0) }
-                        else if process::Command::new("pactl")
+                    ui.static_color(
+                        88,
+                        if process::Command::new("lsusb")
+                            .arg("-d")
+                            .arg("17a0:0304")
+                            .stdout(process::Stdio::null())
+                            .status()?
+                            .success()
+                        {
+                            Color::simple(0)
+                        } else if process::Command::new("pactl")
                             .arg("list")
                             .arg("short")
                             .arg("source-outputs")
                             .output()?
-                            .stdout.is_empty() { Color::simple(9) }
-                        else { Color::flashing(9, 0) }
+                            .stdout
+                            .is_empty()
+                        {
+                            Color::simple(9)
+                        } else {
+                            Color::flashing(9, 0)
+                        },
                     );
                     // ui.static_color(88, Color::simple(
                     //     if process::Command::new("pactl")
@@ -1268,7 +1027,8 @@ fn main() -> eyre::Result<()> {
                         i3.run_command("exec --no-startup-id i3-workspace-swap")?;
                     }
                     ui.play_pause_button(58, Color::simple(21), Color::simple(23))?;
-                    if ui.impulse_button(51, Color::simple(109), Color::simple(109)) { // was color 61
+                    if ui.impulse_button(51, Color::simple(109), Color::simple(109)) {
+                        // was color 61
                         // simulate_press(&[MetaLeft, ShiftLeft, KeyF])?;
                         // simulate_press(&[Alt, ShiftLeft, KeyF])?;
                         // thread::sleep(Duration::from_millis(10));
@@ -1377,7 +1137,10 @@ fn main() -> eyre::Result<()> {
                     // 233.0818, None, 277.1826, 311.1269, None, 369.9944, 415.3046,
                     // 466.1637, None, 554.3652, 622.2539, None, 739.9888, 830.6093
                     for (i, freq) in //[262, 294, 330, 349, 392, 440, 494, 524]
-                        [261.6255, 293.6647, 329.6275, 349.2282, 391.9954, 440.0, 493.8833, 523.2511]
+                        [
+                            261.6255, 293.6647, 329.6275, 349.2282, 391.9954, 440.0, 493.8833,
+                            523.2511,
+                        ]
                         .into_iter()
                         .enumerate()
                     {
@@ -1391,14 +1154,26 @@ fn main() -> eyre::Result<()> {
                             // TODO: replace with cpal thing
                             // audio_state.lock().active = true;
                             let x: &mut HashMap<usize, NoteState> = &mut audio_state.lock().notes;
-                            x.entry(i + 100).or_insert_with(|| NoteState::new(freq as f32)).input = true;
+                            x.entry(i + 100)
+                                .or_insert_with(|| NoteState::new(freq as f32))
+                                .input = true;
                         } else {
                             let x: &mut HashMap<usize, NoteState> = &mut audio_state.lock().notes;
-                            x.entry(i + 100).or_insert_with(|| NoteState::new(freq as f32)).input = false;
+                            x.entry(i + 100)
+                                .or_insert_with(|| NoteState::new(freq as f32))
+                                .input = false;
                         }
                     }
-                    for (i, freq) in //[Some(277), Some(311), None, Some(370), Some(415), Some(466)]
-                        [Some(277.1826), Some(311.1269), None, Some(369.9944), Some(415.3046), Some(466.1637)]
+                    for (i, freq) in
+                        //[Some(277), Some(311), None, Some(370), Some(415), Some(466)]
+                        [
+                            Some(277.1826),
+                            Some(311.1269),
+                            None,
+                            Some(369.9944),
+                            Some(415.3046),
+                            Some(466.1637),
+                        ]
                         .into_iter()
                         .enumerate()
                     {
@@ -1407,17 +1182,22 @@ fn main() -> eyre::Result<()> {
                                 (i + 22) as Key,
                                 Color::Simple(SimpleColor::Static(94)),
                                 Color::Simple(SimpleColor::Static(93)),
-                            )
-                            {
+                            ) {
                                 // sample.osc_frequency(freq);
                                 // mixer.lock().play(sample);
                                 // TODO: replace with cpal thing
                                 // audio_state.lock().active = false;
-                                let x: &mut HashMap<usize, NoteState> = &mut audio_state.lock().notes;
-                                x.entry(i + 200).or_insert_with(|| NoteState::new(freq as f32)).input = true;
+                                let x: &mut HashMap<usize, NoteState> =
+                                    &mut audio_state.lock().notes;
+                                x.entry(i + 200)
+                                    .or_insert_with(|| NoteState::new(freq as f32))
+                                    .input = true;
                             } else {
-                                let x: &mut HashMap<usize, NoteState> = &mut audio_state.lock().notes;
-                                x.entry(i + 200).or_insert_with(|| NoteState::new(freq as f32)).input = false;
+                                let x: &mut HashMap<usize, NoteState> =
+                                    &mut audio_state.lock().notes;
+                                x.entry(i + 200)
+                                    .or_insert_with(|| NoteState::new(freq as f32))
+                                    .input = false;
                             }
                         }
                     }
@@ -1443,7 +1223,10 @@ fn main() -> eyre::Result<()> {
                     // }
                     for (row, freq_mult) in [0.5, 1.0, 2.0, 4.0].into_iter().enumerate() {
                         for (i, freq) in //[262, 294, 330, 349, 392, 440, 494, 524]
-                        [261.6255, 293.6647, 329.6275, 349.2282, 391.9954, 440.0, 493.8833, 523.2511]
+                            [
+                                261.6255, 293.6647, 329.6275, 349.2282, 391.9954, 440.0, 493.8833,
+                                523.2511,
+                            ]
                             .into_iter()
                             .enumerate()
                         {
@@ -1456,15 +1239,29 @@ fn main() -> eyre::Result<()> {
                                 // mixer.lock().play(sample);
                                 // TODO: replace with cpal thing
                                 // audio_state.lock().active = true;
-                                let x: &mut HashMap<usize, NoteState> = &mut audio_state.lock().notes;
-                                x.entry(i + 1000 + (row * 100)).or_insert_with(|| NoteState::new(freq as f32 * freq_mult)).input = true;
+                                let x: &mut HashMap<usize, NoteState> =
+                                    &mut audio_state.lock().notes;
+                                x.entry(i + 1000 + (row * 100))
+                                    .or_insert_with(|| NoteState::new(freq as f32 * freq_mult))
+                                    .input = true;
                             } else {
-                                let x: &mut HashMap<usize, NoteState> = &mut audio_state.lock().notes;
-                                x.entry(i + 1000 + (row * 100)).or_insert_with(|| NoteState::new(freq as f32 * freq_mult)).input = false;
+                                let x: &mut HashMap<usize, NoteState> =
+                                    &mut audio_state.lock().notes;
+                                x.entry(i + 1000 + (row * 100))
+                                    .or_insert_with(|| NoteState::new(freq as f32 * freq_mult))
+                                    .input = false;
                             }
                         }
-                        for (i, freq) in //[Some(277), Some(311), None, Some(370), Some(415), Some(466)]
-                        [Some(277.1826), Some(311.1269), None, Some(369.9944), Some(415.3046), Some(466.1637)]
+                        for (i, freq) in
+                            //[Some(277), Some(311), None, Some(370), Some(415), Some(466)]
+                            [
+                                Some(277.1826),
+                                Some(311.1269),
+                                None,
+                                Some(369.9944),
+                                Some(415.3046),
+                                Some(466.1637),
+                            ]
                             .into_iter()
                             .enumerate()
                         {
@@ -1473,17 +1270,22 @@ fn main() -> eyre::Result<()> {
                                     (i + 22 + (row * 20)) as Key,
                                     Color::Simple(SimpleColor::Static(94)),
                                     Color::Simple(SimpleColor::Static(93)),
-                                )
-                                {
+                                ) {
                                     // sample.osc_frequency(freq);
                                     // mixer.lock().play(sample);
                                     // TODO: replace with cpal thing
                                     // audio_state.lock().active = false;
-                                    let x: &mut HashMap<usize, NoteState> = &mut audio_state.lock().notes;
-                                    x.entry(i + 2000 + (row * 100)).or_insert_with(|| NoteState::new(freq as f32 * freq_mult)).input = true;
+                                    let x: &mut HashMap<usize, NoteState> =
+                                        &mut audio_state.lock().notes;
+                                    x.entry(i + 2000 + (row * 100))
+                                        .or_insert_with(|| NoteState::new(freq as f32 * freq_mult))
+                                        .input = true;
                                 } else {
-                                    let x: &mut HashMap<usize, NoteState> = &mut audio_state.lock().notes;
-                                    x.entry(i + 2000 + (row * 100)).or_insert_with(|| NoteState::new(freq as f32 * freq_mult)).input = false;
+                                    let x: &mut HashMap<usize, NoteState> =
+                                        &mut audio_state.lock().notes;
+                                    x.entry(i + 2000 + (row * 100))
+                                        .or_insert_with(|| NoteState::new(freq as f32 * freq_mult))
+                                        .input = false;
                                 }
                             }
                         }
