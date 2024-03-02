@@ -1276,11 +1276,17 @@ fn main() -> eyre::Result<()> {
                         // simulate_release(&[Alt, ShiftLeft, KeyF])?;
                         i3.run_command("exec --no-startup-id lock")?;
                     }
-                    if ui.impulse_button(67, Color::simple(70), Color::simple(71)) {
+                    if ui.impulse_button(66, Color::simple(70), Color::simple(71)) {
                         i3.run_command("exec --no-startup-id iot big-lamp on")?;
                     }
-                    if ui.impulse_button(57, Color::simple(70), Color::simple(71)) {
+                    if ui.impulse_button(56, Color::simple(70), Color::simple(71)) {
                         i3.run_command("exec --no-startup-id iot big-lamp off")?;
+                    }
+                    if ui.impulse_button(67, Color::simple(70), Color::simple(71)) {
+                        i3.run_command("exec --no-startup-id iot tall-lamp on")?;
+                    }
+                    if ui.impulse_button(57, Color::simple(70), Color::simple(71)) {
+                        i3.run_command("exec --no-startup-id iot tall-lamp off")?;
                     }
                     if ui.impulse_button(52, Color::simple(110), Color::simple(110)) {
                         i3.run_command("exec --no-startup-id xset dpms force off")?;
