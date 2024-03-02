@@ -1291,6 +1291,33 @@ fn main() -> eyre::Result<()> {
                     if ui.impulse_button(52, Color::simple(110), Color::simple(110)) {
                         i3.run_command("exec --no-startup-id xset dpms force off")?;
                     }
+                    // soundboard
+                    if ui.toggle_button(55, Color::simple(118), Color::simple(119)) {
+                        if ui.impulse_button(44, Color::simple(18), Color::simple(19)) {
+                            i3.run_command("exec --no-startup-id paplay --device mixin-to-mix-sink /home/ash/Downloads/boowomp.mp3")?;
+                        }
+                        if ui.impulse_button(31, Color::simple(5), Color::simple(6)) {
+                            i3.run_command("exec --no-startup-id paplay --device mixin-to-mix-sink /home/ash/Downloads/metal-pipe.mp3")?;
+                        }
+                        if ui.impulse_button(45, Color::simple(14), Color::simple(15)) {
+                            i3.run_command("exec --no-startup-id paplay --device mixin-to-mix-sink /home/ash/Downloads/bonk.mp3")?;
+                        }
+                        if ui.impulse_button(46, Color::simple(104), Color::simple(112)) {
+                            i3.run_command("exec --no-startup-id paplay --device mixin-to-mix-sink /home/ash/Downloads/cave1.ogg")?;
+                        }
+                        if ui.impulse_button(47, Color::simple(49), Color::simple(50)) {
+                            i3.run_command("exec --no-startup-id paplay --device mixin-to-mix-sink /home/ash/Downloads/discord-join.mp3")?;
+                        }
+                        if ui.impulse_button(48, Color::simple(49), Color::simple(50)) {
+                            i3.run_command("exec --no-startup-id paplay --device mixin-to-mix-sink /home/ash/Downloads/discord-ping.mp3")?;
+                        }
+                        if ui.impulse_button(33, Color::simple(79), Color::simple(66)) {
+                            i3.run_command("exec --no-startup-id paplay --device mixin-to-mix-sink /home/ash/Downloads/windows-disconnect.mp3")?;
+                        }
+                        if ui.impulse_button(43, Color::simple(79), Color::simple(66)) {
+                            i3.run_command("exec --no-startup-id paplay --device mixin-to-mix-sink /home/ash/Downloads/windows-connect.mp3")?;
+                        }
+                    }
 
                     // playback bar
                     // let cmd_position = process::Command::new("playerctl")
