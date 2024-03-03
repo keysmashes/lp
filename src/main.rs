@@ -196,20 +196,32 @@ fn main() -> eyre::Result<()> {
     }
     struct AudioState {
         notes: HashMap<usize, NoteState>,
+        config: Option<cpal::StreamConfig>,
+        glitch_mode: bool,
     }
-    fn get_audio_frame(audio_state: &mut AudioState) -> f32 {
+    fn get_audio_frame(audio_state: &mut AudioState, len: usize) -> f32 {
         let mut value: f32 = 0.0;
+        let sample_rate = audio_state.config.as_ref().unwrap().sample_rate.0 as f32;
         for (_, state) in audio_state.notes.iter_mut() {
             if state.input {
                 state.volume = 1.0;
             }
             if state.volume > 0.0 {
-                state.clock += 1.0;
-                if state.clock >= 44100.0 {
-                    state.clock = 0.0;
-                }
-                let period = state.clock / 44100.0;
-                let sample = (state.freq * std::f32::consts::TAU * period * 2.0).sin();
+                let phi = if audio_state.glitch_mode {
+                    // glitch album time
+                    state.clock += state.freq / sample_rate;
+                    state.clock
+                } else {
+                    state.clock += len as f32;
+                    // figure out some multiple of the period (breaks if bottom-heavy, so pick a high multiplier)
+                    let period = sample_rate / state.freq;
+                    // prevent the clock running away
+                    while state.clock > period {
+                        state.clock -= period;
+                    }
+                    state.clock / sample_rate
+                };
+                let sample = (state.freq * std::f32::consts::TAU * phi).sin();
                 value += sample * 0.2 * state.volume;
                 state.volume -= 0.0004;
             } else {
@@ -220,6 +232,8 @@ fn main() -> eyre::Result<()> {
     }
     let audio_state = Arc::new(Mutex::new(AudioState {
         notes: HashMap::new(),
+        config: None,
+        glitch_mode: false,
     }));
     let stream = device.build_output_stream(
         &cpal::StreamConfig {
@@ -230,11 +244,14 @@ fn main() -> eyre::Result<()> {
         {
             // https://github.com/0xC45/simple-synth/blob/42611692157830df9c17de10dd20abb4ee2806e1/src/main.rs#L236
             let state = audio_state.clone();
+            let channels = config.channels() as usize;
+            state.lock().config = Some(config.config());
             move |data: &mut [f32], _info| {
-                for frame in data.chunks_mut(config.channels() as usize) {
-                    let v = get_audio_frame(&mut state.lock());
-                    for value in frame.iter_mut() {
-                        *value = v;
+                for frame in data.chunks_mut(channels) {
+                    let len = frame.len();
+                    let v = get_audio_frame(&mut state.lock(), len);
+                    for sample in frame.iter_mut() {
+                        *sample = v;
                     }
                 }
             }
@@ -665,6 +682,10 @@ fn main() -> eyre::Result<()> {
                     }
                 }
                 2 => {
+                    // "fuck up" button
+                    audio_state.lock().glitch_mode =
+                        ui.toggle_button(89, Color::simple(61), Color::pulsing(60));
+
                     for (row, freq_mult) in [0.5, 1.0, 2.0, 4.0].into_iter().enumerate() {
                         for (i, freq) in [
                             261.6255, 293.6647, 329.6275, 349.2282, 391.9954, 440.0, 493.8833,
