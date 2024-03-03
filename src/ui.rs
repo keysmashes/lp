@@ -1,4 +1,4 @@
-use crate::Event;
+use super::Event;
 use lp::{Color, Command, Key, Launchpad, SimpleColor, TextColor};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -43,7 +43,12 @@ impl<'a> Ui<'a> {
     }
     /// A toggleable button.
     #[track_caller]
-    pub(crate) fn toggle_button(&mut self, key: Key, inactive_color: Color, active_color: Color) -> bool {
+    pub(crate) fn toggle_button(
+        &mut self,
+        key: Key,
+        inactive_color: Color,
+        active_color: Color,
+    ) -> bool {
         static DATA: Lazy<Mutex<HashMap<(Key, &Location), bool>>> =
             Lazy::new(|| Mutex::new(HashMap::new()));
         let mut data = DATA.lock();
