@@ -226,18 +226,12 @@ fn main() -> eyre::Result<()> {
             channels: 1,
             sample_rate: cpal::SampleRate(44100),
             buffer_size: cpal::BufferSize::Default,
-            // buffer_size: cpal::BufferSize::Fixed(2048 * 8),
         },
         {
-            // let mixer = mixer.clone();
-            // move |mut data: &mut [f32], _info| {
-            //     mixer.lock().generate(data);
-            // }
             // https://github.com/0xC45/simple-synth/blob/42611692157830df9c17de10dd20abb4ee2806e1/src/main.rs#L236
             let state = audio_state.clone();
             move |data: &mut [f32], _info| {
                 for frame in data.chunks_mut(config.channels() as usize) {
-                    // let v = cpal::Sample::from::<f32>(&get_audio_frame());
                     let v = get_audio_frame(&mut state.lock());
                     for value in frame.iter_mut() {
                         *value = v;
@@ -246,6 +240,7 @@ fn main() -> eyre::Result<()> {
             }
         },
         |error| Err(error).wrap_err("uhh").unwrap(),
+        None,
     )?;
     stream.play()?;
 
