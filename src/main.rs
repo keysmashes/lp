@@ -542,6 +542,9 @@ fn main() -> eyre::Result<()> {
                         if ui.impulse_button(44, Color::simple(18), Color::simple(19)) {
                             i3.run_command("exec --no-startup-id paplay --device mixin-to-mix-sink /home/ash/Downloads/boowomp.mp3")?;
                         }
+                        if ui.impulse_button(34, Color::simple(18), Color::simple(19)) {
+                            i3.run_command("exec --no-startup-id paplay --device mixin-to-mix-sink /home/ash/Downloads/trombone.mp3")?;
+                        }
                         if ui.impulse_button(31, Color::simple(5), Color::simple(6)) {
                             i3.run_command("exec --no-startup-id paplay --device mixin-to-mix-sink /home/ash/Downloads/metal-pipe.mp3")?;
                         }
