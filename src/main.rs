@@ -493,7 +493,7 @@ fn main() -> eyre::Result<()> {
 
                     // shortcuts
                     ui.static_color(
-                        88,
+                        87,
                         if process::Command::new("lsusb")
                             .arg("-d")
                             .arg("17a0:0304")
@@ -534,8 +534,21 @@ fn main() -> eyre::Result<()> {
                     if ui.impulse_button(57, Color::simple(70), Color::simple(71)) {
                         i3.run_command("exec --no-startup-id iot tall-lamp off")?;
                     }
+                    // https://github.com/adamesch/elgato-key-light-api/tree/master/resources/lights
+                    if ui.impulse_button(88, Color::simple(70), Color::simple(71)) {
+                        i3.run_command("exec --no-startup-id http --ignore-stdin PUT 192.168.1.130:9123/elgato/lights numberOfLights=1 lights:='[{\"on\": 1}]'")?;
+                    }
+                    if ui.impulse_button(78, Color::simple(70), Color::simple(71)) {
+                        i3.run_command("exec --no-startup-id http --ignore-stdin PUT 192.168.1.130:9123/elgato/lights numberOfLights=1 lights:='[{\"on\": 0}]'")?;
+                    }
                     if ui.impulse_button(52, Color::simple(110), Color::simple(110)) {
                         i3.run_command("exec --no-startup-id xset dpms force off")?;
+                    }
+                    if ui.impulse_button(54, Color::simple(10), Color::simple(9)) {
+                        // i3.run_command("exec --no-startup-id pkill -USR1 gpu-screen-reco")?;
+                        let _ = duct::cmd!("pkill", "-USR1", "gpu-screen-reco")
+                            .unchecked()
+                            .run();
                     }
                     // soundboard
                     if ui.toggle_button(55, Color::simple(118), Color::simple(119)) {
