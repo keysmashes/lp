@@ -512,7 +512,7 @@ fn main() -> eyre::Result<()> {
                         {
                             Color::simple(9)
                         } else {
-                            Color::flashing(9, 0)
+                            Color::flashing(8, 8)
                         },
                     );
                     if ui.impulse_button(68, Color::simple(92), Color::simple(92)) {
