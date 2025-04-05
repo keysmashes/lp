@@ -516,7 +516,7 @@ fn main() -> eyre::Result<()> {
                         },
                     );
                     if ui.impulse_button(68, Color::simple(92), Color::simple(92)) {
-                        i3.run_command("exec --no-startup-id i3-workspace-swap")?;
+                        i3.run_command("exec --no-startup-id openrgb -p default")?;
                     }
                     ui.play_pause_button(58, Color::simple(21), Color::simple(23))?;
                     if ui.impulse_button(51, Color::simple(109), Color::simple(109)) {
@@ -543,6 +543,7 @@ fn main() -> eyre::Result<()> {
                     }
                     if ui.impulse_button(52, Color::simple(110), Color::simple(110)) {
                         i3.run_command("exec --no-startup-id xset dpms force off")?;
+                        i3.run_command("exec --no-startup-id openrgb -p off")?;
                     }
                     if ui.impulse_button(54, Color::simple(10), Color::simple(9)) {
                         // i3.run_command("exec --no-startup-id pkill -USR1 gpu-screen-reco")?;
