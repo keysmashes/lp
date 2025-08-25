@@ -522,24 +522,26 @@ fn main() -> eyre::Result<()> {
                     if ui.impulse_button(51, Color::simple(109), Color::simple(109)) {
                         i3.run_command("exec --no-startup-id lock")?;
                     }
+                    // reading lamp
                     if ui.impulse_button(66, Color::simple(70), Color::simple(71)) {
-                        i3.run_command("exec --no-startup-id iot big-lamp on")?;
+                        i3.run_command("exec --no-startup-id director on b276c5a2-c2a6-457d-9637-b30c3175170f_1")?;
                     }
                     if ui.impulse_button(56, Color::simple(70), Color::simple(71)) {
-                        i3.run_command("exec --no-startup-id iot big-lamp off")?;
+                        i3.run_command("exec --no-startup-id director off b276c5a2-c2a6-457d-9637-b30c3175170f_1")?;
                     }
+                    // window lamp
                     if ui.impulse_button(67, Color::simple(70), Color::simple(71)) {
-                        i3.run_command("exec --no-startup-id iot tall-lamp on")?;
+                        i3.run_command("exec --no-startup-id director on 9920ff47-8524-47d5-8a11-780836e2e1c6_1")?;
                     }
                     if ui.impulse_button(57, Color::simple(70), Color::simple(71)) {
-                        i3.run_command("exec --no-startup-id iot tall-lamp off")?;
+                        i3.run_command("exec --no-startup-id director off 9920ff47-8524-47d5-8a11-780836e2e1c6_1")?;
                     }
-                    // https://github.com/adamesch/elgato-key-light-api/tree/master/resources/lights
+                    // my desk lamp
                     if ui.impulse_button(88, Color::simple(70), Color::simple(71)) {
-                        i3.run_command("exec --no-startup-id http --ignore-stdin PUT 192.168.1.130:9123/elgato/lights numberOfLights=1 lights:='[{\"on\": 1}]'")?;
+                        i3.run_command("exec --no-startup-id director on 3b716c07-5829-4a44-b673-a1b5311bd051_1")?;
                     }
                     if ui.impulse_button(78, Color::simple(70), Color::simple(71)) {
-                        i3.run_command("exec --no-startup-id http --ignore-stdin PUT 192.168.1.130:9123/elgato/lights numberOfLights=1 lights:='[{\"on\": 0}]'")?;
+                        i3.run_command("exec --no-startup-id director off 3b716c07-5829-4a44-b673-a1b5311bd051_1")?;
                     }
                     if ui.impulse_button(52, Color::simple(110), Color::simple(110)) {
                         i3.run_command("exec --no-startup-id xset dpms force off")?;
