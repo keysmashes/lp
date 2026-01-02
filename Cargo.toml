@@ -9,7 +9,7 @@ edition = "2021"
 
 [dependencies]
 bounded-integer = { version = "0.5.2", features = ["types"] }
-cpal = "0.15.2"
+cpal = "0.17.0"
 duct = "0.13.5"
 eyre = "0.6.8"
 i3_ipc = "0.15.0-alpha"

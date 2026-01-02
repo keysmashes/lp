@@ -201,7 +201,7 @@ fn main() -> eyre::Result<()> {
     }
     fn get_audio_frame(audio_state: &mut AudioState, len: usize) -> f32 {
         let mut value: f32 = 0.0;
-        let sample_rate = audio_state.config.as_ref().unwrap().sample_rate.0 as f32;
+        let sample_rate = audio_state.config.as_ref().unwrap().sample_rate as f32;
         for (_, state) in audio_state.notes.iter_mut() {
             if state.input {
                 state.volume = 1.0;
@@ -238,7 +238,7 @@ fn main() -> eyre::Result<()> {
     let stream = device.build_output_stream(
         &cpal::StreamConfig {
             channels: 1,
-            sample_rate: cpal::SampleRate(44100),
+            sample_rate: 44100,
             buffer_size: cpal::BufferSize::Default,
         },
         {
