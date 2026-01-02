@@ -515,10 +515,10 @@ fn main() -> eyre::Result<()> {
                             Color::flashing(8, 8)
                         },
                     );
-                    if ui.impulse_button(68, Color::simple(92), Color::simple(92)) {
-                        i3.run_command("exec --no-startup-id openrgb -p default")?;
-                    }
-                    ui.play_pause_button(58, Color::simple(21), Color::simple(23))?;
+                    // if ui.impulse_button(88, Color::simple(92), Color::simple(92)) {
+                    //     i3.run_command("exec --no-startup-id openrgb -p default")?;
+                    // }
+                    ui.play_pause_button(78, Color::simple(21), Color::simple(23))?;
                     if ui.impulse_button(51, Color::simple(109), Color::simple(109)) {
                         i3.run_command("exec --no-startup-id lock")?;
                     }
@@ -537,10 +537,10 @@ fn main() -> eyre::Result<()> {
                         i3.run_command("exec --no-startup-id director off 9920ff47-8524-47d5-8a11-780836e2e1c6_1")?;
                     }
                     // my desk lamp
-                    if ui.impulse_button(88, Color::simple(70), Color::simple(71)) {
+                    if ui.impulse_button(68, Color::simple(70), Color::simple(71)) {
                         i3.run_command("exec --no-startup-id director on 3b716c07-5829-4a44-b673-a1b5311bd051_1")?;
                     }
-                    if ui.impulse_button(78, Color::simple(70), Color::simple(71)) {
+                    if ui.impulse_button(58, Color::simple(70), Color::simple(71)) {
                         i3.run_command("exec --no-startup-id director off 3b716c07-5829-4a44-b673-a1b5311bd051_1")?;
                     }
                     if ui.impulse_button(52, Color::simple(110), Color::simple(110)) {
