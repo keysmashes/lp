@@ -203,8 +203,8 @@ fn main() -> eyre::Result<()> {
         let mut value: f32 = 0.0;
         let sample_rate = audio_state.config.as_ref().unwrap().sample_rate as f32;
         for (_, state) in audio_state.notes.iter_mut() {
-            if state.input {
-                state.volume = 1.0;
+            if state.input && state.volume < 1.0 {
+                state.volume = (state.volume + 0.02).clamp(0.0, 1.0);
             }
             if state.volume > 0.0 {
                 let phi = if audio_state.glitch_mode {
@@ -223,7 +223,9 @@ fn main() -> eyre::Result<()> {
                 };
                 let sample = (state.freq * std::f32::consts::TAU * phi).sin();
                 value += sample * 0.2 * state.volume;
-                state.volume -= 0.0004;
+                if !state.input {
+                    state.volume -= 0.0004;
+                }
             } else {
                 state.clock = 0.0;
             }
