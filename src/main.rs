@@ -17,6 +17,7 @@ use eyre::WrapErr;
 use i3_ipc::{Connect, I3};
 use itertools::Itertools;
 use parking_lot::Mutex;
+use tap::Pipe;
 
 use lp::{
     coords_to_key, key_to_coords, rect, Color, Command, ComplexColor, Key, Launchpad, Message,
@@ -198,6 +199,9 @@ fn main() -> eyre::Result<()> {
         notes: HashMap<usize, NoteState>,
         config: Option<cpal::StreamConfig>,
         glitch_mode: bool,
+        no_tanh: bool,
+        alpha: f32,
+        forget_copysign: bool,
     }
     fn get_audio_frame(audio_state: &mut AudioState, len: usize) -> f32 {
         let mut value: f32 = 0.0;
@@ -230,12 +234,19 @@ fn main() -> eyre::Result<()> {
                 state.clock = 0.0;
             }
         }
-        value
+        if audio_state.no_tanh {
+            value
+        } else {
+            value.powi(2).powf(audio_state.alpha / 2.0).tanh().powf(1.0 / audio_state.alpha).pipe(|x| if audio_state.forget_copysign { x } else { x.copysign(value) })
+        }
     }
     let audio_state = Arc::new(Mutex::new(AudioState {
         notes: HashMap::new(),
         config: None,
         glitch_mode: false,
+        no_tanh: false,
+        alpha: 3.0,
+        forget_copysign: false,
     }));
     let stream = device.build_output_stream(
         &cpal::StreamConfig {
@@ -706,6 +717,18 @@ fn main() -> eyre::Result<()> {
                     // "fuck up" button
                     audio_state.lock().glitch_mode =
                         ui.toggle_button(89, Color::simple(61), Color::pulsing(60));
+                    audio_state.lock().no_tanh =
+                        ui.toggle_button(79, Color::simple(8), Color::simple(5));
+                    audio_state.lock().forget_copysign =
+                        ui.toggle_button(39, Color::simple(8), Color::pulsing(9));
+
+                    if ui.impulse_button(69, Color::simple(2), Color::simple(1)) {
+                        audio_state.lock().alpha += 0.1;
+                    }
+                    if ui.impulse_button(59, Color::simple(2), Color::simple(1)) {
+                        audio_state.lock().alpha -= 0.1;
+                    }
+                    ui.info_button(49, Color::simple(41), &audio_state.lock().alpha.to_string());
 
                     for (row, freq_mult) in [0.5, 1.0, 2.0, 4.0].into_iter().enumerate() {
                         for (i, freq) in [
