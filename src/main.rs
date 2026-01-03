@@ -1,12 +1,11 @@
 mod animations;
 mod ui;
 
-use std::collections::HashMap;
-use std::process;
 use std::{
-    collections::hash_map::DefaultHasher,
+    collections::{HashMap, hash_map::DefaultHasher},
     hash::{Hash, Hasher},
     io::{BufRead, BufReader},
+    process,
     sync::{atomic::AtomicBool, mpsc, Arc},
     thread,
     time::Duration,
@@ -237,7 +236,18 @@ fn main() -> eyre::Result<()> {
         if audio_state.no_tanh {
             value
         } else {
-            value.powi(2).powf(audio_state.alpha / 2.0).tanh().powf(1.0 / audio_state.alpha).pipe(|x| if audio_state.forget_copysign { x } else { x.copysign(value) })
+            value
+                .powi(2)
+                .powf(audio_state.alpha / 2.0)
+                .tanh()
+                .powf(1.0 / audio_state.alpha)
+                .pipe(|x| {
+                    if audio_state.forget_copysign {
+                        x
+                    } else {
+                        x.copysign(value)
+                    }
+                })
         }
     }
     let audio_state = Arc::new(Mutex::new(AudioState {
