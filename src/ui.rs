@@ -253,6 +253,39 @@ impl<'a> Ui<'a> {
         *awake
     }
     #[track_caller]
+    pub(crate) fn cat_protection(&mut self, key: Key, color: Color, keys: &[Key]) -> bool {
+        struct Datum {
+            cat: bool,
+            pressed: usize,
+        }
+        static DATA: Lazy<Mutex<HashMap<(Key, &Location), Datum>>> =
+            Lazy::new(|| Mutex::new(HashMap::new()));
+        let mut data = DATA.lock();
+        let datum = data.entry((key, Location::caller())).or_insert(Datum { cat: false, pressed: 0 });
+        if !datum.cat {
+            *self.fb.get_mut(&key).unwrap() = color;
+            datum.pressed = 0;
+            if let Event::KeyDown(k) = self.event && k == key {
+                datum.cat = true;
+            }
+        }
+        if datum.cat {
+            for k in keys {
+                *self.fb.get_mut(k).unwrap() = color;
+            }
+            match self.event {
+                Event::KeyDown(k) if keys.contains(&k) => datum.pressed += 1,
+                Event::KeyUp(k) if keys.contains(&k) => datum.pressed -= 1,
+                _ => {},
+            };
+            if datum.pressed == keys.len() {
+                datum.cat = false;
+                self.event = Event::Redraw;
+            }
+        }
+        !datum.cat
+    }
+    #[track_caller]
     pub(crate) fn play_pause_button(
         &mut self,
         key: Key,

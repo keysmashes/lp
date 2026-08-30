@@ -84,6 +84,7 @@ enum Event {
     Exit,
 }
 
+#[allow(static_mut_refs)] // TODO: don't
 fn main() -> eyre::Result<()> {
     let (tx, rx) = mpsc::channel();
 
@@ -335,7 +336,7 @@ fn main() -> eyre::Result<()> {
             launchpad_for_side_effects: &mut launchpad,
             tx_for_side_effects: &tx,
         };
-        if ui.awake(19, Color::Simple(SimpleColor::Static(47))) {
+        if ui.cat_protection(29, Color::simple(55), &[11, 18, 81, 88]) && ui.awake(19, Color::Simple(SimpleColor::Static(47))) {
             let tab = ui.tabs::<4>(95);
             match tab {
                 0 => {
