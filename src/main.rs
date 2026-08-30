@@ -541,6 +541,9 @@ fn main() -> eyre::Result<()> {
                     // if ui.impulse_button(88, Color::simple(92), Color::simple(92)) {
                     //     i3.run_command("exec --no-startup-id openrgb -p default")?;
                     // }
+                    if ui.impulse_button(76, Color::simple(50), Color::simple(51)) {
+                        i3.run_command("exec --no-startup-id autorandr -c")?;
+                    }
                     ui.play_pause_button(78, Color::simple(21), Color::simple(23))?;
                     if ui.impulse_button(51, Color::simple(109), Color::simple(109)) {
                         i3.run_command("exec --no-startup-id lock")?;
