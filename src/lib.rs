@@ -312,16 +312,14 @@ impl Launchpad {
         let midi_out_port = midi_out
             .ports()
             .into_iter()
-            // .find(|p| midi_out.port_name(p).unwrap().contains("LPMiniMK3 MI"))
-            .find(|p| midi_out.port_name(p).unwrap().contains("LPMiniMK3 DA"))
+            .find(|p| midi_out.port_name(p).unwrap().contains("LPMiniMK3 MI"))
             .ok_or(ConnectionError::NotFoundError)?;
         let out_con = midi_out.connect(&midi_out_port, "to launchpad")?;
 
         let midi_in_port = midi_in
             .ports()
             .into_iter()
-            // .find(|p| midi_in.port_name(p).unwrap().contains("LPMiniMK3 MI"))
-            .find(|p| midi_in.port_name(p).unwrap().contains("LPMiniMK3 DA"))
+            .find(|p| midi_in.port_name(p).unwrap().contains("LPMiniMK3 MI"))
             .expect("no launchpad found");
         let in_con = midi_in.connect(
             &midi_in_port,
