@@ -280,7 +280,7 @@ fn main() -> eyre::Result<()> {
                 }
             }
         },
-        |error| Err(error).wrap_err("uhh").unwrap(),
+        |error| eprintln!("cpal error: {}", error),
         None,
     )?;
     stream.play()?;
