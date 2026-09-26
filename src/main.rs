@@ -731,18 +731,8 @@ fn main() -> eyre::Result<()> {
                     // "fuck up" button
                     audio_state.lock().glitch_mode =
                         ui.toggle_button(89, Color::simple(61), Color::pulsing(60));
-                    audio_state.lock().no_tanh =
-                        ui.toggle_button(79, Color::simple(8), Color::simple(5));
                     audio_state.lock().forget_copysign =
-                        ui.toggle_button(39, Color::simple(8), Color::pulsing(9));
-
-                    if ui.impulse_button(69, Color::simple(2), Color::simple(1)) {
-                        audio_state.lock().alpha += 0.1;
-                    }
-                    if ui.impulse_button(59, Color::simple(2), Color::simple(1)) {
-                        audio_state.lock().alpha -= 0.1;
-                    }
-                    ui.info_button(49, Color::simple(41), &audio_state.lock().alpha.to_string());
+                        ui.toggle_button(79, Color::simple(8), Color::pulsing(9));
 
                     for (row, freq_mult) in [0.5, 1.0, 2.0, 4.0].into_iter().enumerate() {
                         for (i, freq) in [
