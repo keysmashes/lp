@@ -8,8 +8,6 @@ edition = "2024"
 [workspace]
 
 [dependencies]
-bounded-integer = { version = "0.5.2", features = ["types"] }
-cpal = "0.17.0"
 duct = "0.13.5"
 eyre = "0.6.8"
 i3_ipc = "0.15.0-alpha"
@@ -18,7 +16,6 @@ midir = "0.7"
 once_cell = "1.10.0"
 parking_lot = "0.12.0"
 signal-hook = "0.3.13"
-tap = "1.0.1"
 thiserror = "1.0.31"
 
 [patch.crates-io]

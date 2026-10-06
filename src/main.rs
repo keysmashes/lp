@@ -11,12 +11,9 @@ use std::{
     time::Duration,
 };
 
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use eyre::WrapErr;
 use i3_ipc::{Connect, I3};
 use itertools::Itertools;
-use parking_lot::Mutex;
-use tap::Pipe;
 
 use lp::{
     coords_to_key, key_to_coords, rect, Color, Command, ComplexColor, Key, Launchpad, Message,
@@ -175,115 +172,6 @@ fn main() -> eyre::Result<()> {
     for key in rect(11, 99) {
         fb.insert(key, Color::Simple(SimpleColor::Static(0)));
     }
-
-    let host = cpal::default_host();
-    let device = host.default_output_device().unwrap();
-    let config = device.default_output_config().unwrap();
-    struct NoteState {
-        input: bool,
-        volume: f32,
-        clock: f32,
-        freq: f32,
-    }
-    impl NoteState {
-        fn new(freq: f32) -> Self {
-            NoteState {
-                input: false,
-                volume: 0.0,
-                clock: 0.0,
-                freq,
-            }
-        }
-    }
-    struct AudioState {
-        notes: HashMap<usize, NoteState>,
-        config: Option<cpal::StreamConfig>,
-        glitch_mode: bool,
-        no_tanh: bool,
-        alpha: f32,
-        forget_copysign: bool,
-    }
-    fn get_audio_frame(audio_state: &mut AudioState, len: usize) -> f32 {
-        let mut value: f32 = 0.0;
-        let sample_rate = audio_state.config.as_ref().unwrap().sample_rate as f32;
-        for (_, state) in audio_state.notes.iter_mut() {
-            if state.input && state.volume < 1.0 {
-                state.volume = (state.volume + 0.02).clamp(0.0, 1.0);
-            }
-            if state.volume > 0.0 {
-                let phi = if audio_state.glitch_mode {
-                    // glitch album time
-                    state.clock += state.freq / sample_rate;
-                    state.clock
-                } else {
-                    state.clock += len as f32;
-                    // figure out some multiple of the period (breaks if bottom-heavy, so pick a high multiplier)
-                    let period = sample_rate / state.freq;
-                    // prevent the clock running away
-                    while state.clock > period {
-                        state.clock -= period;
-                    }
-                    state.clock / sample_rate
-                };
-                let sample = (state.freq * std::f32::consts::TAU * phi).sin();
-                value += sample * 0.2 * state.volume;
-                if !state.input {
-                    state.volume -= 0.0004;
-                }
-            } else {
-                state.clock = 0.0;
-            }
-        }
-        if audio_state.no_tanh {
-            value
-        } else {
-            value
-                .powi(2)
-                .powf(audio_state.alpha / 2.0)
-                .tanh()
-                .powf(1.0 / audio_state.alpha)
-                .pipe(|x| {
-                    if audio_state.forget_copysign {
-                        x
-                    } else {
-                        x.copysign(value)
-                    }
-                })
-        }
-    }
-    let audio_state = Arc::new(Mutex::new(AudioState {
-        notes: HashMap::new(),
-        config: None,
-        glitch_mode: false,
-        no_tanh: false,
-        alpha: 3.0,
-        forget_copysign: false,
-    }));
-    let stream = device.build_output_stream(
-        &cpal::StreamConfig {
-            channels: 1,
-            sample_rate: 44100,
-            buffer_size: cpal::BufferSize::Default,
-        },
-        {
-            // https://github.com/0xC45/simple-synth/blob/42611692157830df9c17de10dd20abb4ee2806e1/src/main.rs#L236
-            let state = audio_state.clone();
-            let channels = config.channels() as usize;
-            state.lock().config = Some(config.config());
-            move |data: &mut [f32], _info| {
-                for frame in data.chunks_mut(channels) {
-                    let len = frame.len();
-                    let v = get_audio_frame(&mut state.lock(), len);
-                    for sample in frame.iter_mut() {
-                        *sample = v;
-                    }
-                }
-            }
-        },
-        |error| eprintln!("cpal error: {}", error),
-        None,
-    )?;
-    stream.play()?;
 
     let mut i3 = I3::connect()?;
     let mut workspaces = i3.get_workspaces()?;
@@ -642,79 +530,6 @@ fn main() -> eyre::Result<()> {
                     //         );
                     //     }
                     // }
-
-                    // piano
-                    // calculated with rink:
-                    // > 27.5 * (2**3)
-                    // 220  (dimensionless)
-                    // > 220 * ((2 ** (1/12)) ** 0)
-                    // approx. 220  (dimensionless)
-                    // > 220 * ((2 ** (1/12)) ** 1)
-                    // approx. 233.0818  (dimensionless)
-                    // > 220 * ((2 ** (1/12)) ** 2)
-                    // approx. 246.9416  (dimensionless)
-                    // ...and so on up to 12 (= 440)
-                    // white notes: 0, 2, 3, 5, 7, 8, 10:
-                    // 220.0, 246.9416, 261.6255, 293.6647, 329.6275, 349.2282, 391.9954,
-                    // 440.0, 493.8833, 523.2511, 587.3295, 659.2551, 698.4564, 783.9908
-                    // black notes: 1, (gap), 4, 6, (gap), 9, 11:
-                    // 233.0818, None, 277.1826, 311.1269, None, 369.9944, 415.3046,
-                    // 466.1637, None, 554.3652, 622.2539, None, 739.9888, 830.6093
-                    for (i, freq) in //[262, 294, 330, 349, 392, 440, 494, 524]
-                        [
-                            261.6255, 293.6647, 329.6275, 349.2282, 391.9954, 440.0, 493.8833,
-                            523.2511,
-                        ]
-                        .into_iter()
-                        .enumerate()
-                    {
-                        if ui.holdable_button(
-                            (i + 11) as Key,
-                            Color::Simple(SimpleColor::Static(92)),
-                            Color::Simple(SimpleColor::Static(91)),
-                        ) {
-                            let x: &mut HashMap<usize, NoteState> = &mut audio_state.lock().notes;
-                            x.entry(i + 100)
-                                .or_insert_with(|| NoteState::new(freq as f32))
-                                .input = true;
-                        } else {
-                            let x: &mut HashMap<usize, NoteState> = &mut audio_state.lock().notes;
-                            x.entry(i + 100)
-                                .or_insert_with(|| NoteState::new(freq as f32))
-                                .input = false;
-                        }
-                    }
-                    for (i, freq) in [
-                        Some(277.1826),
-                        Some(311.1269),
-                        None,
-                        Some(369.9944),
-                        Some(415.3046),
-                        Some(466.1637),
-                    ]
-                    .into_iter()
-                    .enumerate()
-                    {
-                        if let Some(freq) = freq {
-                            if ui.holdable_button(
-                                (i + 22) as Key,
-                                Color::Simple(SimpleColor::Static(94)),
-                                Color::Simple(SimpleColor::Static(93)),
-                            ) {
-                                let x: &mut HashMap<usize, NoteState> =
-                                    &mut audio_state.lock().notes;
-                                x.entry(i + 200)
-                                    .or_insert_with(|| NoteState::new(freq as f32))
-                                    .input = true;
-                            } else {
-                                let x: &mut HashMap<usize, NoteState> =
-                                    &mut audio_state.lock().notes;
-                                x.entry(i + 200)
-                                    .or_insert_with(|| NoteState::new(freq as f32))
-                                    .input = false;
-                            }
-                        }
-                    }
                 }
                 1 => {
                     let base = u8::try_from(ui.counter_buttons::<2>(93) * 64).unwrap();
@@ -728,86 +543,7 @@ fn main() -> eyre::Result<()> {
                     }
                 }
                 2 => {
-                    // "fuck up" button
-                    audio_state.lock().glitch_mode =
-                        ui.toggle_button(89, Color::simple(61), Color::pulsing(60));
-                    audio_state.lock().forget_copysign =
-                        ui.toggle_button(79, Color::simple(8), Color::pulsing(9));
-
-                    if ui.toggle_button(69, Color::simple(1), Color::simple(1)) {
-                        // JI lattice
-                        for row in 1..=8 {
-                            for col in 1..=7 {
-                                let fifths = f64::powf(3./2., row as f64 - 1.);
-                                let thirds = f64::powf(5./4., col as f64 - 1.);
-                                let freq = 55. * fifths * thirds;
-                                audio_state.lock().notes.entry(10_000 + (row as usize) * 10 + (col as usize))
-                                    .or_insert_with(|| NoteState::new(freq as f32))
-                                    .input = ui.holdable_button(row * 10 + col, Color::simple(1), Color::simple(2))
-                            }
-                        }
-                    } else {
-                        // regular piano keyboard
-                        for (row, freq_mult) in [0.5, 1.0, 2.0, 4.0].into_iter().enumerate() {
-                            for (i, freq) in [
-                                261.6255, 293.6647, 329.6275, 349.2282, 391.9954, 440.0, 493.8833,
-                                523.2511,
-                            ]
-                                .into_iter()
-                                .enumerate()
-                            {
-                                if ui.holdable_button(
-                                    (i + 11 + (row * 20)) as Key,
-                                    Color::Simple(SimpleColor::Static(92)),
-                                    Color::Simple(SimpleColor::Static(91)),
-                                ) {
-                                    let x: &mut HashMap<usize, NoteState> =
-                                        &mut audio_state.lock().notes;
-                                    x.entry(i + 1000 + (row * 100))
-                                        .or_insert_with(|| NoteState::new(freq as f32 * freq_mult))
-                                        .input = true;
-                                } else {
-                                    let x: &mut HashMap<usize, NoteState> =
-                                        &mut audio_state.lock().notes;
-                                    x.entry(i + 1000 + (row * 100))
-                                        .or_insert_with(|| NoteState::new(freq as f32 * freq_mult))
-                                        .input = false;
-                                }
-                            }
-                            for (i, freq) in [
-                                Some(277.1826),
-                                Some(311.1269),
-                                None,
-                                Some(369.9944),
-                                Some(415.3046),
-                                Some(466.1637),
-                            ]
-                                .into_iter()
-                                .enumerate()
-                            {
-                                if let Some(freq) = freq {
-                                    if ui.holdable_button(
-                                        (i + 22 + (row * 20)) as Key,
-                                        Color::Simple(SimpleColor::Static(94)),
-                                        Color::Simple(SimpleColor::Static(93)),
-                                    ) {
-                                        let x: &mut HashMap<usize, NoteState> =
-                                            &mut audio_state.lock().notes;
-                                        x.entry(i + 2000 + (row * 100))
-                                            .or_insert_with(|| NoteState::new(freq as f32 * freq_mult))
-                                            .input = true;
-                                    } else {
-                                        let x: &mut HashMap<usize, NoteState> =
-                                            &mut audio_state.lock().notes;
-                                        x.entry(i + 2000 + (row * 100))
-                                            .or_insert_with(|| NoteState::new(freq as f32 * freq_mult))
-                                            .input = false;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
+                    // TODO
                 }
                 3 => {
                     // "L", "D"
