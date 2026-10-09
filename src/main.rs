@@ -42,33 +42,6 @@ fn configure_signals(tx: mpsc::Sender<Event>) -> eyre::Result<()> {
     Ok(())
 }
 
-fn _stress_test(launchpad: &mut Launchpad) -> eyre::Result<()> {
-    let mut vec_a = vec![];
-    let mut vec_b = vec![];
-    let mut vec_c = vec![];
-    for i in 11..=19 {
-        for j in 0..=8 {
-            vec_a.push((i + 10 * j, ComplexColor::Rgb(127, 0, 0)));
-            vec_b.push((i + 10 * j, ComplexColor::Rgb(0, 127, 0)));
-            vec_c.push((i + 10 * j, ComplexColor::Rgb(0, 0, 127)));
-        }
-    }
-    let a = Command::SetColors(&vec_a);
-    let b = Command::SetColors(&vec_b);
-    let c = Command::SetColors(&vec_c);
-    const US: u64 = 4000;
-    for _ in 0..100 {
-        launchpad.send(&a)?;
-        thread::sleep(Duration::from_micros(US));
-        launchpad.send(&b)?;
-        thread::sleep(Duration::from_micros(US));
-        launchpad.send(&c)?;
-        thread::sleep(Duration::from_micros(US));
-    }
-    launchpad.send(&Command::KeyOn(55, SimpleColor::Static(13)))?;
-    Ok(())
-}
-
 #[derive(Debug, Eq, PartialEq)]
 #[non_exhaustive]
 enum Event {
@@ -255,7 +228,6 @@ fn main() -> eyre::Result<()> {
                             if let Some(w) = w_by_num.get(&(workspace_num as i32)) {
                                 let first_time = ui.monostable(w.urgent, workspace_num);
                                 if w.urgent {
-                                    // Color::simple(9)
                                     if first_time {
                                         animations::alert(
                                             ui.launchpad_for_side_effects,
@@ -427,9 +399,6 @@ fn main() -> eyre::Result<()> {
                             Color::flashing(8, 8)
                         },
                     );
-                    // if ui.impulse_button(88, Color::simple(92), Color::simple(92)) {
-                    //     i3.run_command("exec --no-startup-id openrgb -p default")?;
-                    // }
                     if ui.impulse_button(76, Color::simple(50), Color::simple(51)) {
                         i3.run_command("exec --no-startup-id autorandr -c")?;
                     }
@@ -463,7 +432,6 @@ fn main() -> eyre::Result<()> {
                         i3.run_command("exec --no-startup-id openrgb -p off")?;
                     }
                     if ui.impulse_button(54, Color::simple(10), Color::simple(9)) {
-                        // i3.run_command("exec --no-startup-id pkill -USR1 gpu-screen-reco")?;
                         let _ = duct::cmd!("pkill", "-USR1", "gpu-screen-reco")
                             .unchecked()
                             .run();
