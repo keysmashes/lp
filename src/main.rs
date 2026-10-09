@@ -15,10 +15,7 @@ use eyre::WrapErr;
 use i3_ipc::{Connect, I3};
 use itertools::Itertools;
 
-use lp::{
-    coords_to_key, key_to_coords, rect, Color, Command, ComplexColor, Key, Launchpad, Message,
-    SimpleColor,
-};
+use lp::{coords_to_key, key_to_coords, rect, Color, Command, ComplexColor, Key, Launchpad, Message, SimpleColor, Direction::{Up, Right, Down, Left}, line};
 
 fn configure_signals(tx: mpsc::Sender<Event>) -> eyre::Result<()> {
     let interrupted = Arc::new(AtomicBool::new(false));
@@ -465,39 +462,50 @@ fn main() -> eyre::Result<()> {
                         if ui.impulse_button(43, Color::simple(79), Color::simple(66)) {
                             i3.run_command("exec --no-startup-id paplay --device mixin-to-mix-sink /home/ash/Downloads/windows-connect.mp3")?;
                         }
+                    } else {
+                        // playback bar
+                        let cmd_position = process::Command::new("playerctl")
+                            .arg("position")
+                            .output()?;
+                        let position: Option<u64> = cmd_position.status.success().then(|| {
+                            (1000000.0 // microseconds in a second
+                                * std::str::from_utf8(&cmd_position.stdout)
+                                .unwrap()
+                                .trim_end()
+                                .parse()
+                                .unwrap_or(0.0)) as u64
+                        });
+                        let cmd_length = process::Command::new("playerctl")
+                            .arg("metadata")
+                            .arg("mpris:length")
+                            .output()?;
+                        let length: Option<u64> = cmd_length.status.success().then(|| {
+                            std::str::from_utf8(&cmd_length.stdout)
+                                .unwrap()
+                                .trim_end()
+                                .parse()
+                                .unwrap_or(0)
+                        });
+                        if let (Some(pos), Some(len)) = (position, length) {
+                            const KEYS: u64 = 19;
+                            let mut offset = 0;
+                            for (start, direction, length) in [
+                                (42, Right, 7),
+                                (38, Down, 2),
+                                (18, Left, 8),
+                                (21, Up, 2),
+                            ] {
+                                for (i, key) in line(start, direction, length).enumerate() {
+                                    let start = (i as u64 + offset) * len / KEYS;
+                                    let end = (i as u64 + offset + 1) * len / KEYS;
+                                    if ui.impulse_button(key, Color::simple(if pos >= start && pos < end { 33 } else { 35 }), Color::simple(32)) {
+                                        process::Command::new("playerctl").arg("position").arg((start as f64 / 1000000.0).to_string()).status()?;
+                                    }
+                                }
+                                offset += length as u64;
+                            }
+                        }
                     }
-
-                    // playback bar
-                    // let cmd_position = process::Command::new("playerctl")
-                    //     .arg("position")
-                    //     .output()?;
-                    // let position: Option<u64> = cmd_position.status.success().then(|| {
-                    //     (1000000.0
-                    //         * std::str::from_utf8(&cmd_position.stdout)
-                    //             .unwrap()
-                    //             .trim_end()
-                    //             .parse()
-                    //             .unwrap_or(0.0)) as u64
-                    // });
-                    // let cmd_length = process::Command::new("playerctl")
-                    //     .arg("metadata")
-                    //     .arg("mpris:length")
-                    //     .output()?;
-                    // let length: Option<u64> = cmd_length.status.success().then(|| {
-                    //     std::str::from_utf8(&cmd_length.stdout)
-                    //         .unwrap()
-                    //         .trim_end()
-                    //         .parse()
-                    //         .unwrap_or(0)
-                    // });
-                    // if let (Some(pos), Some(len)) = (position, length) {
-                    //     for (i, key) in rect(31, 38).enumerate() {
-                    //         ui.static_color(
-                    //             key,
-                    //             Color::simple(if pos > i as u64 * len / 8 { 49 } else { 51 }),
-                    //         );
-                    //     }
-                    // }
                 }
                 1 => {
                     let base = u8::try_from(ui.counter_buttons::<2>(93) * 64).unwrap();

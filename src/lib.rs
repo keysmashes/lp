@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::iter;
-
 use midir::{ConnectError, MidiInput, MidiOutput};
 use thiserror::Error;
 
@@ -63,6 +62,34 @@ pub fn rect(a: Key, b: Key) -> impl Iterator<Item = Key> {
         }
     })
     .map(|(x, y)| coords_to_key(x, y))
+}
+
+pub fn line(start: Key, direction: Direction, length: u8) -> impl Iterator<Item = Key> {
+    let (x0, y0) = key_to_coords(start);
+
+    let (dx, dy): (i8, i8) = match direction {
+        Direction::Up => (0, 1),
+        Direction::Right => (1, 0 ),
+        Direction::Down => (0, -1),
+        Direction::Left => (-1, 0) ,
+    };
+
+    iter::successors(if length > 0 { Some((1, x0, y0)) } else { None }, move |(i, x, y)| {
+        if *i < length {
+            Some((i + 1, x.checked_add_signed(dx)?, y.checked_add_signed(dy)?))
+        } else {
+            None
+        }
+    })
+    .map(|(_, x, y)| coords_to_key(x, y))
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Direction {
+    Up,
+    Right,
+    Down,
+    Left,
 }
 
 pub type Key = u8;
