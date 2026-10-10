@@ -399,7 +399,6 @@ fn main() -> eyre::Result<()> {
                     if ui.impulse_button(76, Color::simple(50), Color::simple(51)) {
                         i3.run_command("exec --no-startup-id autorandr -c")?;
                     }
-                    ui.play_pause_button(78, Color::simple(21), Color::simple(23))?;
                     if ui.impulse_button(51, Color::simple(109), Color::simple(109)) {
                         i3.run_command("exec --no-startup-id lock")?;
                     }
@@ -463,6 +462,7 @@ fn main() -> eyre::Result<()> {
                             i3.run_command("exec --no-startup-id paplay --device mixin-to-mix-sink /home/ash/Downloads/windows-connect.mp3")?;
                         }
                     } else {
+                        ui.play_pause_button(41, Color::simple(21), Color::simple(23))?;
                         // playback bar
                         let cmd_position = process::Command::new("playerctl")
                             .arg("position")
