@@ -107,7 +107,7 @@ fn main() -> eyre::Result<()> {
     thread::spawn({
         let tx = tx.clone();
         move || {
-            const T: Duration = Duration::from_secs(10);
+            const T: Duration = Duration::from_secs(5);
             loop {
                 thread::sleep(T);
                 tx.send(Event::Redraw).unwrap();
